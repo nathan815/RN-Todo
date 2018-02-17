@@ -75,17 +75,13 @@ export default class TodoApp extends Component {
     });
   }
 
-  generateNoteList() {
+  generateNoteList(filter) {
     return this.state.notes
-    .filter((val) => {
-      // check for filters
-      if(this.state.filterIndex === FILTER_PENDING && val.completed ||
-        this.state.filterIndex === FILTER_COMPLETED && !val.completed)
-        return false;
-      
-      return true;
-    })
     .map((val, key) => {
+      if(this.state.filterIndex === FILTER_PENDING && val.completed || 
+          this.state.filterIndex === FILTER_COMPLETED && !val.completed) {
+        return;
+      }
       return <Note key={key} keyval={key} val={val} 
                    markCompleted={() => this.markCompleted(key)} 
                    delete={() => this.confirmDeleteNote(key)} />;
@@ -94,18 +90,22 @@ export default class TodoApp extends Component {
 
   render() {
     let notes = this.generateNoteList();
-    if(notes.length <= 0) {
-      notes = <View style={styles.noNotes}>
-              <Icon name="layers-clear" size={45} color="#444" />
-              <Text style={styles.noNotesText}>No todo items to show</Text>
-            </View>;
+    const pendingCount = this.state.notes.filter((val) => !val.completed).length;
+    // check if notes is empty (or full of null values)
+    if(notes.filter((val) => val != null ).length <= 0) {
+      notes = (
+        <View style={styles.noNotes}>
+          <Icon name="layers-clear" size={45} color="#444" />
+          <Text style={styles.noNotesText}>No todo items to show</Text>
+        </View>
+      );
     }
 
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <Text style={styles.headerText}>My Todo List</Text>
+          <Text style={styles.headerText}>My Todo List ({pendingCount})</Text>
         </View>
         <SegmentedControlIOS 
           style={styles.segmentedControl}
@@ -122,7 +122,7 @@ export default class TodoApp extends Component {
         <KeyboardAvoidingView style={styles.footer} keyboardVerticalOffset={10} behavior="padding">
           <TextInput 
             style={styles.addTodoInput} 
-            placeholder="What do you need to do?" 
+            placeholder="What do you want to do?" 
             onChangeText={(newNoteText) => this.setState({ newNoteText })}
             value={this.state.newNoteText} 
             onSubmitEditing={this.addNote}
