@@ -17,6 +17,7 @@ import { Icon } from 'react-native-elements';
 
 import Note from './components/Note';
 
+const FILTER_OPTIONS = ['All','Pending','Completed'];
 const FILTER_ALL = 0;
 const FILTER_PENDING = 1;
 const FILTER_COMPLETED = 2;
@@ -28,7 +29,7 @@ export default class TodoApp extends Component {
     this.state = {
       notes: [],
       newNoteText: "",
-      filterIndex: 0
+      filterIndex: FILTER_PENDING
     };
     this.markCompleted = this.markCompleted.bind(this);
     this.deleteNote = this.deleteNote.bind(this);
@@ -38,12 +39,20 @@ export default class TodoApp extends Component {
   addNote() {
     const notes = this.state.notes;
     const text = this.state.newNoteText.trim();
+    let filterIndex = this.state.filterIndex;
     if(!text)
       return;
-    notes.push({ text: text, timestamp: new Date().toISOString() });
+    if(filterIndex === FILTER_COMPLETED)
+      filterIndex = FILTER_PENDING;
+    notes.push({ 
+      text, 
+      completed: false,
+      timestamp: new Date().toISOString()
+    });
     this.setState({
-      notes: notes,
-      newNoteText: ""
+      notes,
+      filterIndex,
+      newNoteText: "",
     });
     Keyboard.dismiss();
   }
@@ -84,7 +93,7 @@ export default class TodoApp extends Component {
       }
       return <Note key={key} keyval={key} val={val} 
                    markCompleted={() => this.markCompleted(key)} 
-                   delete={() => this.confirmDeleteNote(key)} />;
+                   delete={() => this.confirmDeleteNote(key)} />
     });
   }
 
@@ -110,7 +119,7 @@ export default class TodoApp extends Component {
         <SegmentedControlIOS 
           style={styles.segmentedControl}
           tintColor="steelblue"
-          values={['All','Pending','Completed']}
+          values={FILTER_OPTIONS}
           selectedIndex={this.state.filterIndex}
           onChange={(event) => {
             this.setState({filterIndex: event.nativeEvent.selectedSegmentIndex});
@@ -128,7 +137,7 @@ export default class TodoApp extends Component {
             onSubmitEditing={this.addNote}
           />
           <TouchableOpacity style={styles.addTodoBtn} onPress={this.addNote}>
-            <Icon name="add" color="white" />
+            <Icon name="add" color="#fff" />
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </View>
@@ -167,7 +176,7 @@ const styles = StyleSheet.create({
   },
   addTodoBtn: {
     flex: 1,
-    padding: 10,
+    padding: 9,
     backgroundColor: 'steelblue',
     alignItems: 'center',
     borderRadius: 7,
