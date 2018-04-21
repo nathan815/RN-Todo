@@ -11,7 +11,9 @@ import {
   KeyboardAvoidingView,
   Alert,
   Keyboard,
-  SegmentedControlIOS
+  SegmentedControlIOS,
+  AsyncStorage,
+  ActivityIndicator
 } from 'react-native';
 import { Icon } from 'react-native-elements';
 
@@ -24,184 +26,227 @@ const FILTER_COMPLETED = 2;
 
 export default class TodoApp extends Component {
 
-  constructor(props) {
-    super(props);
-    this.state = {
-      notes: [],
-      newNoteText: "",
-      filterIndex: FILTER_PENDING
+    constructor(props) {
+        super(props);
+        this.state = {
+            notes: [],
+            newNoteText: "",
+            filterIndex: FILTER_PENDING,
+            loading: true
+        };
+        this.markCompleted = this.markCompleted.bind(this);
+        this.deleteNote = this.deleteNote.bind(this);
+        this.addNote = this.addNote.bind(this);
     };
-    this.markCompleted = this.markCompleted.bind(this);
-    this.deleteNote = this.deleteNote.bind(this);
-    this.addNote = this.addNote.bind(this);
-  };
 
-  addNote() {
+componentWillMount() {
+    this.retrieveNotesFromStorage();
+}
+
+componentDidUpdate() {
+    this.saveNotesToStorage();
+}
+
+async saveNotesToStorage() {
+    try {
+        await AsyncStorage.setItem('@Todo:notes', JSON.stringify(this.state.notes));
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+async retrieveNotesFromStorage() {
+    try {
+        const value = await AsyncStorage.getItem('@Todo:notes');
+        if (value !== null) {
+            this.setState({
+              notes: JSON.parse(value),
+              loading: false
+            });
+        }
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+addNote() {
     const notes = this.state.notes;
     const text = this.state.newNoteText.trim();
     let filterIndex = this.state.filterIndex;
     if(!text)
       return;
-    if(filterIndex === FILTER_COMPLETED)
+  if(filterIndex === FILTER_COMPLETED)
       filterIndex = FILTER_PENDING;
-    notes.push({ 
+  notes.push({ 
       text, 
       completed: false,
-      timestamp: new Date().toISOString()
-    });
-    this.setState({
+      timestamp: new Date()
+  });
+  this.setState({
       notes,
       filterIndex,
       newNoteText: "",
-    });
-    Keyboard.dismiss();
-  }
+  });
+  Keyboard.dismiss();
+}
 
-  markCompleted(key) {
+markCompleted(key) {
     const notes = this.state.notes;
     notes[key].completed = !notes[key].completed;
     this.setState({
       notes: notes
-    });
-  }
+  });
+}
 
-  confirmDeleteNote(key) {
+confirmDeleteNote(key) {
     Alert.alert(
       'Delete Item',
       'Do you really want to delete this todo item?',
       [
-        {text: 'Cancel', style: 'cancel'},
-        {text: 'Yes', onPress: () => this.deleteNote(key)},
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Yes', onPress: () => this.deleteNote(key)},
       ]
-    );
-  }
+      );
+}
 
-  deleteNote(key) {
+deleteNote(key) {
     const notes = this.state.notes;
     notes.splice(key,1);
     this.setState({
       notes: notes
-    });
-  }
+  });
+}
 
-  generateNoteList(filter) {
+generateNoteList(filter) {
     return this.state.notes
     .map((val, key) => {
-      if(this.state.filterIndex === FILTER_PENDING && val.completed || 
+        if(this.state.filterIndex === FILTER_PENDING && val.completed || 
           this.state.filterIndex === FILTER_COMPLETED && !val.completed) {
-        return;
-      }
-      return <Note key={key} keyval={key} val={val} 
-                   markCompleted={() => this.markCompleted(key)} 
-                   delete={() => this.confirmDeleteNote(key)} />
+            return;
+        }
+        return <Note key={key} keyval={key} val={val} 
+                     markCompleted={() => this.markCompleted(key)} 
+                     delete={() => this.confirmDeleteNote(key)} />
     });
-  }
+}
 
-  render() {
+render() {
     let notes = this.generateNoteList();
     const pendingCount = this.state.notes.filter((val) => !val.completed).length;
     // check if notes is empty (or full of null values)
-    if(notes.filter((val) => val != null ).length <= 0) {
-      notes = (
-        <View style={styles.noNotes}>
-          <Icon name="layers-clear" size={45} color="#444" />
-          <Text style={styles.noNotesText}>No todo items to show</Text>
-        </View>
-      );
+    if(this.state.loading) {
+        notes = (
+            <View style={styles.noNotes}>
+                <ActivityIndicator size="large" color="steelblue" />
+                <Text style={styles.loadingText}>Loading Todo List</Text>
+            </View>
+        );
+    } else if (notes.filter((val) => val != null ).length <= 0) {
+        notes = (
+            <View style={styles.noNotes}>
+                <Icon name="layers-clear" size={45} color="#444" />
+                <Text style={styles.noNotesText}>No todo items to show</Text>
+            </View>
+        );
     }
 
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.header}>
+          <View style={styles.container}>
+          <StatusBar barStyle="light-content" />
+          <View style={styles.header}>
           <Text style={styles.headerText}>My Todo List ({pendingCount})</Text>
-        </View>
-        <SegmentedControlIOS 
+          </View>
+          <SegmentedControlIOS 
           style={styles.segmentedControl}
           tintColor="steelblue"
           values={FILTER_OPTIONS}
           selectedIndex={this.state.filterIndex}
           onChange={(event) => {
             this.setState({filterIndex: event.nativeEvent.selectedSegmentIndex});
-          }}
+        }}
         />
         <ScrollView style={styles.scrollView}>
-         {notes}
+        {notes}
         </ScrollView>
         <KeyboardAvoidingView style={styles.footer} keyboardVerticalOffset={10} behavior="padding">
-          <TextInput 
+            <TextInput 
             style={styles.addTodoInput} 
             placeholder="What do you want to do?" 
             onChangeText={(newNoteText) => this.setState({ newNoteText })}
             value={this.state.newNoteText} 
             onSubmitEditing={this.addNote}
-          />
-          <TouchableOpacity style={styles.addTodoBtn} onPress={this.addNote}>
-            <Icon name="add" color="#fff" />
-          </TouchableOpacity>
+            />
+            <TouchableOpacity style={styles.addTodoBtn} onPress={this.addNote}>
+                <Icon name="add" color="#fff" />
+            </TouchableOpacity>
         </KeyboardAvoidingView>
-      </View>
-    );
-  }
+        </View>
+        );
+}
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingBottom: 10
-  },
-  content: {
+},
+content: {
     flex: 1
-  },
-  header: {
+},
+header: {
     backgroundColor: 'steelblue',
     alignItems: 'center'
-  },
-  headerText: {
+},
+headerText: {
     fontSize: 20,
     padding: 10,
     paddingTop: Platform.OS == 'ios' ? 24 : 0,
     color: 'white'
-  },
-  segmentedControl: {
+},
+segmentedControl: {
     margin:10
-  },
-  footer: {
+},
+footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 10
-  },
-  scrollView: {
-  },
-  addTodoBtn: {
+},
+scrollView: {
+},
+addTodoBtn: {
     flex: 1,
     padding: 9,
     backgroundColor: 'steelblue',
     alignItems: 'center',
     borderRadius: 7,
     marginLeft: 10
-  },
-  addTodoBtnText: {
+},
+addTodoBtnText: {
     color: 'white',
     fontSize: 15
-  },
-  addTodoInput: {
+},
+addTodoInput: {
     flex: 5,
     backgroundColor: '#f5f5f5',
     padding: 12,
     borderRadius: 7,
     borderWidth: 1,
     borderColor: '#e5e5e5'
-  },
-  noNotes: {
+},
+noNotes: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 70
-  },
-  noNotesText: {
+},
+noNotesText: {
     marginTop: 20,
     fontSize: 20
-  }
+},
+loadingText: {
+    marginTop: 20,
+    fontSize: 17,
+    color: 'steelblue'
+}
 });
